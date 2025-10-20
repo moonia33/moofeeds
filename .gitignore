@@ -1,0 +1,5 @@
+dist/
+*.zip
+var/cache/*
+var/lock/*
+.DS_Store
