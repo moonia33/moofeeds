@@ -105,7 +105,7 @@ Modulio administravimo puslapyje (Modules > Module Manager > moofeeds):
 
 ## Atitikties pastabos
 - Facebook laukai: `id,title,description,availability,condition,price,link,image_link,brand,sale_price,item_group_id,google_product_category,mpn,gtin,custom_label_0..4`.
-- Google Ads Business Data laukai: `id,item_title,final_url,image_url,price,sale_price,availability,brand,condition,item_category,mpn,gtin,custom_label_0..4`.
+- Google Ads Business Data laukai (tikslūs pavadinimai, jautrūs raidėms ir tarpams): `ID, ID2, Item title, Final URL, Image URL, Item subtitle, Item description, Item category, Price, Sale price, Contextual keywords, Item address, Tracking template, Custom parameter, Final mobile URL, Android app link, iOS app link, iOS app store ID, Formatted price, Formatted sale price`.
 - Kainos formatuojamos kaip `123.45 EUR` (Newsman feed'e — be valiutos, tik skaitinė reikšmė).
 
 ## Trikčių šalinimas
@@ -213,7 +213,7 @@ In Modules > Module Manager > moofeeds:
 
 ## Compliance notes
 - Facebook fields: `id,title,description,availability,condition,price,link,image_link,brand,sale_price,item_group_id,google_product_category,mpn,gtin,custom_label_0..4`.
-- Google Ads Business Data fields: `id,item_title,final_url,image_url,price,sale_price,availability,brand,condition,item_category,mpn,gtin,custom_label_0..4`.
+- Google Ads Business Data fields (exact names, case- and space-sensitive): `ID, ID2, Item title, Final URL, Image URL, Item subtitle, Item description, Item category, Price, Sale price, Contextual keywords, Item address, Tracking template, Custom parameter, Final mobile URL, Android app link, iOS app link, iOS app store ID, Formatted price, Formatted sale price`.
 - Prices formatted as `123.45 EUR` (Newsman feed uses numeric prices only, no currency suffix).
 
 ## Troubleshooting

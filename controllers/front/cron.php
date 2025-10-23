@@ -32,7 +32,13 @@ class moofeedscronModuleFrontController extends ModuleFrontController
         else if($reset||!file_exists($finalFile)){
             $out=fopen($tmpFile,'w');
             if($feed==='facebook'){ fputcsv($out,['id','title','description','availability','condition','price','link','image_link','brand','sale_price','item_group_id','google_product_category','product_type','mpn','gtin','age_group','gender','color','material','custom_label_0','custom_label_1','custom_label_2','custom_label_3','custom_label_4']); }
-            elseif($feed==='googleads'){ fputcsv($out,['id','item_title','final_url','image_url','price','sale_price','availability','brand','condition','item_category','mpn','gtin','custom_label_0','custom_label_1','custom_label_2','custom_label_3','custom_label_4']); }
+            elseif($feed==='googleads'){
+                // Google Ads Business Data feed requires exact header names (case- and space-sensitive)
+                // See: https://support.google.com/google-ads/answer/6053288
+                fputcsv($out,[
+                    'ID','ID2','Item title','Final URL','Image URL','Item subtitle','Item description','Item category','Price','Sale price','Contextual keywords','Item address','Tracking template','Custom parameter','Final mobile URL','Android app link','iOS app link','iOS app store ID','Formatted price','Formatted sale price'
+                ]);
+            }
             else { fputcsv($out,['product id','product name','product url','image url','stock','price','sale price','brand','category','description']); }
             fclose($out); @chmod($tmpFile,0664); @unlink($finalFile); $state['last_id']=0; $state['processed']=0;
         } else { fclose($lock); header('Content-Type: application/json'); echo json_encode(['status'=>'done','file'=>$finalFile]); exit; }
@@ -69,7 +75,37 @@ class moofeedscronModuleFrontController extends ModuleFrontController
                     $descParts=[]; if($categoryName){$descParts[]=$categoryName;} if(!empty($row['name'])){$descParts[]=$row['name'];} if($brand){$descParts[]=$brand;} $segA=[]; foreach($descParts as $dp){ $segA[]=$this->normalizeSentenceCase($dp);} $description=implode(' - ',$segA); $productType=$this->normalizeSentenceCase($categoryName); $ageGroup='adult'; $gender=$this->deriveGender($features,$categoryName,'female'); if($maleByCatTree){$gender='male';} $color=$this->extractFeatureValue($features,['spalva']); $material=$this->extractFeatureValue($features,['dominuoja']);
                     fputcsv($out,[$productId,$this->normalizeSentenceCase($row['name']),$description,$availability,$condition,$priceStr,$url,$imageUrl,$this->normalizeSentenceCase($brand),$saleStr,'',$this->normalizeSentenceCase($categoryName),$productType,(string)$mpn,(string)$gtin,$ageGroup,$gender,$this->normalizeSentenceCase($color),$this->normalizeSentenceCase($material),$labels[0],$labels[1],$labels[2],$labels[3],$labels[4]]);
                 } elseif($feed==='googleads'){
-                    fputcsv($out,[$productId,$this->normalizeSentenceCase($row['name']),$url,$imageUrl,$priceStr,$saleStr,$availability,$this->normalizeSentenceCase($brand),$condition,$this->normalizeSentenceCase($categoryName),(string)$mpn,(string)$gtin,$labels[0],$labels[1],$labels[2],$labels[3],$labels[4]]);
+                    // Build optional description similar to FB feed
+                    $descParts=[]; if($categoryName){$descParts[]=$categoryName;} if(!empty($row['name'])){$descParts[]=$row['name'];} if($brand){$descParts[]=$brand;}
+                    $segA=[]; foreach($descParts as $dp){ $segA[]=$this->normalizeSentenceCase($dp);} $description=implode(' - ',$segA);
+                    // Contextual keywords: use up to 5 feature values and brand/category keywords
+                    $kwParts=[]; foreach($labels as $kv){ if($kv!==''){ $kwParts[]=$kv; } }
+                    if($brand!==''){ $kwParts[]=$this->normalizeSentenceCase($brand); }
+                    if($categoryName!==''){ $kwParts[]=$this->normalizeSentenceCase($categoryName); }
+                    $contextualKeywords=implode('; ',array_slice($kwParts,0,8));
+                    // Align to the official Google Ads header order
+                    fputcsv($out,[
+                        $productId,                  // ID
+                        '',                           // ID2
+                        $this->normalizeSentenceCase($row['name']), // Item title
+                        $url,                         // Final URL
+                        $imageUrl,                    // Image URL
+                        '',                           // Item subtitle
+                        $description,                 // Item description
+                        $this->normalizeSentenceCase($categoryName), // Item category
+                        $priceStr,                    // Price
+                        $saleStr,                     // Sale price
+                        $contextualKeywords,          // Contextual keywords
+                        '',                           // Item address
+                        '',                           // Tracking template
+                        '',                           // Custom parameter
+                        $url,                         // Final mobile URL (fallback to Final URL)
+                        '',                           // Android app link
+                        '',                           // iOS app link
+                        '',                           // iOS app store ID
+                        '',                           // Formatted price
+                        ''                            // Formatted sale price
+                    ]);
                 } else {
                     $priceNum=(float)number_format($basePriceWithTax,2,'.',''); $saleNum=($priceWithTax>0 && $priceWithTax<($basePriceWithTax-0.005))?(float)number_format($priceWithTax,2,'.',''):$priceNum; $descParts=[]; if($categoryName){$descParts[]=$categoryName;} if(!empty($row['name'])){$descParts[]=$row['name'];} if($brand){$descParts[]=$brand;} $segA=[]; foreach($descParts as $dp){ $segA[]=$this->normalizeSentenceCase($dp);} $description=implode(' - ',$segA);
                     fputcsv($out,[$productId,$this->normalizeSentenceCase($row['name']),$url,$imageUrl,(int)$row['quantity'],number_format($priceNum,2,'.',''),number_format($saleNum,2,'.',''),$this->normalizeSentenceCase($brand),$this->normalizeSentenceCase($categoryName),$description]);
