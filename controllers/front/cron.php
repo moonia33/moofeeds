@@ -9,6 +9,9 @@ class moofeedscronModuleFrontController extends ModuleFrontController
     private function normalizeSentenceCase($text){ $s=trim((string)$text); if($s===''){return $s;} $s=Tools::strtolower($s); return preg_replace_callback('/(^|[\.!\?]\s+|\s-\s)(\p{L})/u',function($m){return $m[1].mb_strtoupper($m[2],'UTF-8');},$s);}    
     private function extractFeatureValue($features,$candidateNames){ if(!is_array($features)||!is_array($candidateNames)){return '';} foreach($features as $f){ $name=Tools::strtolower(trim((string)($f['name']??''))); $val=trim((string)($f['value']??'')); if($name===''){continue;} foreach($candidateNames as $cand){ if($name===Tools::strtolower($cand)){ return $val; } } } return ''; }
     private function deriveGender($features,$categoryName,$default='female'){ $v=$this->extractFeatureValue($features,['lytis','gender']); $srcs=[$v,(string)$categoryName]; foreach($srcs as $src){ $s=Tools::strtolower($src); if($s===''){continue;} if(strpos($s,'vyr')!==false){return 'male';} if(strpos($s,'mot')!==false){return 'female';} if(strpos($s,'uni')!==false||strpos($s,'abi')!==false){return 'unisex';} } return $default; }
+    private function sanitizeInternalLabel($s){ $s=Tools::strtolower(trim((string)$s)); $s=preg_replace('/\s+/u','-',$s); $s=preg_replace("/[^a-z0-9_-]+/u",'', $s); if(mb_strlen($s,'UTF-8')>110){ $s=mb_substr($s,0,110,'UTF-8'); } return $s; }
+    private function isProductNew(Product $product){ $days=(int)Configuration::get('PS_NB_DAYS_NEW_PRODUCT'); if($days<=0){ $days=20; } $dateAdd=isset($product->date_add)?strtotime($product->date_add):0; if($dateAdd<=0){ return false; } return $dateAdd >= (time() - $days*86400); }
+    private function isProductTop($productId){ if(class_exists('ProductSale')){ if(method_exists('ProductSale','getNbSales')){ try { $n=(int)ProductSale::getNbSales((int)$productId); return $n>=10; } catch(\Throwable $e){ return false; } } } return false; }
     private function buildPaths($feed,$shopId,$langId,$currencyIso){ $base=$this->cacheBase(); $this->ensureDir($base); $tmp=sprintf('%s%s-%d-%d-%s.csv.tmp',$base,$feed,$shopId,$langId,$currencyIso); $fin=sprintf('%s%s-%d-%d-%s.csv',$base,$feed,$shopId,$langId,$currencyIso); $state=sprintf('%s%s-%d-%d-%s.state.json',$base,$feed,$shopId,$langId,$currencyIso); return [$tmp,$fin,$state]; }
     private function buildLock($feed,$shopId,$langId,$currencyIso){ $base=$this->lockBase(); $this->ensureDir($base); return sprintf('%s%s-%d-%d-%s.lock',$base,$feed,$shopId,$langId,$currencyIso); }
     private function openLock($lockPath){ $fh=fopen($lockPath,'c'); if($fh&&flock($fh,LOCK_EX|LOCK_NB)){ return $fh; } return null; }
@@ -31,7 +34,7 @@ class moofeedscronModuleFrontController extends ModuleFrontController
         if(file_exists($stateFile)&&!$reset){ $json=@file_get_contents($stateFile); if($json){ $s=json_decode($json,true); if(is_array($s)){ $state=array_merge($state,$s); } } }
         else if($reset||!file_exists($finalFile)){
             $out=fopen($tmpFile,'w');
-            if($feed==='facebook'){ fputcsv($out,['id','title','description','availability','condition','price','link','image_link','brand','sale_price','item_group_id','google_product_category','product_type','mpn','gtin','age_group','gender','color','material','custom_label_0','custom_label_1','custom_label_2','custom_label_3','custom_label_4']); }
+            if($feed==='facebook'){ fputcsv($out,['id','title','description','availability','condition','price','link','image_link','brand','sale_price','item_group_id','google_product_category','product_type','mpn','gtin','age_group','gender','color','material','internal_label']); }
             elseif($feed==='googleads'){
                 // Google Ads Business Data feed requires exact header names (case- and space-sensitive)
                 // See: https://support.google.com/google-ads/answer/6053288
@@ -73,7 +76,14 @@ class moofeedscronModuleFrontController extends ModuleFrontController
                 $mpn=$prodObj->mpn?:$prodObj->reference; $gtin=$prodObj->ean13?:$prodObj->upc;
                 if($feed==='facebook'){
                     $descParts=[]; if($categoryName){$descParts[]=$categoryName;} if(!empty($row['name'])){$descParts[]=$row['name'];} if($brand){$descParts[]=$brand;} $segA=[]; foreach($descParts as $dp){ $segA[]=$this->normalizeSentenceCase($dp);} $description=implode(' - ',$segA); $productType=$this->normalizeSentenceCase($categoryName); $ageGroup='adult'; $gender=$this->deriveGender($features,$categoryName,'female'); if($maleByCatTree){$gender='male';} $color=$this->extractFeatureValue($features,['spalva']); $material=$this->extractFeatureValue($features,['dominuoja']);
-                    fputcsv($out,[$productId,$this->normalizeSentenceCase($row['name']),$description,$availability,$condition,$priceStr,$url,$imageUrl,$this->normalizeSentenceCase($brand),$saleStr,'',$this->normalizeSentenceCase($categoryName),$productType,(string)$mpn,(string)$gtin,$ageGroup,$gender,$this->normalizeSentenceCase($color),$this->normalizeSentenceCase($material),$labels[0],$labels[1],$labels[2],$labels[3],$labels[4]]);
+                    // Build internal_label list: use up to 5 feature values + dynamic flags
+                    $intLabels=[]; foreach($labels as $lv){ $lv=$this->sanitizeInternalLabel($lv); if($lv!==''){ $intLabels[]=$lv; } }
+                    if($this->isProductNew($prodObj)){ $intLabels[]='new'; }
+                    if($this->isProductTop($productId)){ $intLabels[]='top'; }
+                    // Deduplicate and cap reasonable length
+                    $intLabels=array_values(array_unique(array_filter($intLabels,function($v){return $v!=='';})));
+                    $intStr='['.implode(',',array_map(function($v){ return "'".$v."'"; },$intLabels)).']';
+                    fputcsv($out,[$productId,$this->normalizeSentenceCase($row['name']),$description,$availability,$condition,$priceStr,$url,$imageUrl,$this->normalizeSentenceCase($brand),$saleStr,'',$this->normalizeSentenceCase($categoryName),$productType,(string)$mpn,(string)$gtin,$ageGroup,$gender,$this->normalizeSentenceCase($color),$this->normalizeSentenceCase($material),$intStr]);
                 } elseif($feed==='googleads'){
                     // Build optional description similar to FB feed
                     $descParts=[]; if($categoryName){$descParts[]=$categoryName;} if(!empty($row['name'])){$descParts[]=$row['name'];} if($brand){$descParts[]=$brand;}

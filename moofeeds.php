@@ -9,7 +9,7 @@ class Moofeeds extends Module
     {
         $this->name = 'moofeeds';
         $this->tab = 'advertising_marketing';
-    $this->version = '1.0.4';
+    $this->version = '1.1.0';
         $this->author = 'moonia';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '1.7.0.0', 'max' => _PS_VERSION_];

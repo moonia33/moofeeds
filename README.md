@@ -29,7 +29,7 @@ Pastaba: moofeeds taip pat turi Newsman feed'ą (žr. URL skiltį), kurio nėra 
 - Tik pagrindinis produktas (be variacijų) pagal reikalavimą.
 - Kainodara: `price` = bazinė kaina su PVM; `sale_price` rodomas tik kai yra nuolaida.
 - Tekstų normalizacija į "sentence case" (pavadinimai, brand, kategorijos, aprašymo segmentai).
-- `custom_label_0..4` pildomi tik produkto požymių (features) reikšmėmis.
+- `internal_label` — naujasis Facebook laukas. Pildomas sąrašu, pvz., `['summer','trending']`. Modulis automatiškai užpildo iš kelių produkto požymių, taip pat prideda `new` (pagal `PS_NB_DAYS_NEW_PRODUCT`) ir `top` (jei yra pakankamai pardavimų).
 - Paveikslėlių dydis: `large_default` (viršelio nuotrauka).
 - Failo kešas su ETag/Last-Modified; skaitymo URL visada grąžina paskutinį pilną CSV.
 - Cron pagrįstas dalinis (batched) generatorius su būsena ir lock'u.
@@ -104,7 +104,7 @@ Modulio administravimo puslapyje (Modules > Module Manager > moofeeds):
 - Lock failas: `modules/moofeeds/var/lock/<feed>-<shopId>-<langId>-<currencyIso>.lock`
 
 ## Atitikties pastabos
-- Facebook laukai: `id,title,description,availability,condition,price,link,image_link,brand,sale_price,item_group_id,google_product_category,mpn,gtin,custom_label_0..4`.
+- Facebook laukai: `id,title,description,availability,condition,price,link,image_link,brand,sale_price,item_group_id,google_product_category,product_type,mpn,gtin,age_group,gender,color,material,internal_label`.
 - Google Ads Business Data laukai (tikslūs pavadinimai, jautrūs raidėms ir tarpams): `ID, ID2, Item title, Final URL, Image URL, Item subtitle, Item description, Item category, Price, Sale price, Contextual keywords, Item address, Tracking template, Custom parameter, Final mobile URL, Android app link, iOS app link, iOS app store ID, Formatted price, Formatted sale price`.
 - Kainos formatuojamos kaip `123.45 EUR` (Newsman feed'e — be valiutos, tik skaitinė reikšmė).
 
@@ -138,7 +138,7 @@ Note: moofeeds also includes a Newsman feed (see URLs), which is an addition com
 - Main product only (no combinations) by specification.
 - Pricing: `price` = base price incl. VAT; `sale_price` shown only when there’s a discount.
 - Sentence-case normalization for names/brand/category/description segments.
-- `custom_label_0..4` populated from product features only.
+- `internal_label` — Facebook's internal labels array, e.g., `['summer','trending']`. The module fills it from a few product features and adds `new` (based on `PS_NB_DAYS_NEW_PRODUCT`) and `top` (if there are enough sales).
 - Image size: `large_default` (cover image).
 - File cache with ETag/Last-Modified; feed URLs always return the latest complete CSV.
 - Cron-based batched generator with state and locking.
@@ -212,7 +212,7 @@ In Modules > Module Manager > moofeeds:
 - Lock file: `modules/moofeeds/var/lock/<feed>-<shopId>-<langId>-<currencyIso>.lock`
 
 ## Compliance notes
-- Facebook fields: `id,title,description,availability,condition,price,link,image_link,brand,sale_price,item_group_id,google_product_category,mpn,gtin,custom_label_0..4`.
+- Facebook fields: `id,title,description,availability,condition,price,link,image_link,brand,sale_price,item_group_id,google_product_category,product_type,mpn,gtin,age_group,gender,color,material,internal_label`.
 - Google Ads Business Data fields (exact names, case- and space-sensitive): `ID, ID2, Item title, Final URL, Image URL, Item subtitle, Item description, Item category, Price, Sale price, Contextual keywords, Item address, Tracking template, Custom parameter, Final mobile URL, Android app link, iOS app link, iOS app store ID, Formatted price, Formatted sale price`.
 - Prices formatted as `123.45 EUR` (Newsman feed uses numeric prices only, no currency suffix).
 

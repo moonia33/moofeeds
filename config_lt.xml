@@ -2,7 +2,7 @@
 <module>
     <name>moofeeds</name>
     <displayName><![CDATA[moofeeds]]></displayName>
-    <version><![CDATA[1.0.4]]></version>
+    <version><![CDATA[1.1.0]]></version>
     <description><![CDATA[Facebook &amp; Google Ads product feeds]]></description>
     <author><![CDATA[moonia]]></author>
     <tab><![CDATA[advertising_marketing]]></tab>
