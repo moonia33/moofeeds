@@ -9,9 +9,21 @@ class moofeedscronModuleFrontController extends ModuleFrontController
     private function normalizeSentenceCase($text){ $s=trim((string)$text); if($s===''){return $s;} $s=Tools::strtolower($s); return preg_replace_callback('/(^|[\.!\?]\s+|\s-\s)(\p{L})/u',function($m){return $m[1].mb_strtoupper($m[2],'UTF-8');},$s);}    
     private function extractFeatureValue($features,$candidateNames){ if(!is_array($features)||!is_array($candidateNames)){return '';} foreach($features as $f){ $name=Tools::strtolower(trim((string)($f['name']??''))); $val=trim((string)($f['value']??'')); if($name===''){continue;} foreach($candidateNames as $cand){ if($name===Tools::strtolower($cand)){ return $val; } } } return ''; }
     private function deriveGender($features,$categoryName,$default='female'){ $v=$this->extractFeatureValue($features,['lytis','gender']); $srcs=[$v,(string)$categoryName]; foreach($srcs as $src){ $s=Tools::strtolower($src); if($s===''){continue;} if(strpos($s,'vyr')!==false){return 'male';} if(strpos($s,'mot')!==false){return 'female';} if(strpos($s,'uni')!==false||strpos($s,'abi')!==false){return 'unisex';} } return $default; }
-    private function sanitizeInternalLabel($s){ $s=Tools::strtolower(trim((string)$s)); $s=preg_replace('/\s+/u','-',$s); $s=preg_replace("/[^a-z0-9_-]+/u",'', $s); if(mb_strlen($s,'UTF-8')>110){ $s=mb_substr($s,0,110,'UTF-8'); } return $s; }
+    private function sanitizeInternalLabel($s){
+        $s=Tools::strtolower(trim((string)$s));
+        // Replace whitespace with hyphen, but preserve Unicode letters (e.g., ąčęėįšųūž)
+        $s=preg_replace('/\s+/u','-',$s);
+        // Allow Unicode letters and numbers, underscore and hyphen; strip other symbols
+        $s=preg_replace('/[^\p{L}\p{N}_-]+/u','',$s);
+        // Collapse multiple hyphens
+        $s=preg_replace('/-+/u','-',$s);
+        // Trim leading/trailing hyphens
+        $s=trim($s,'-');
+        if(mb_strlen($s,'UTF-8')>110){ $s=mb_substr($s,0,110,'UTF-8'); }
+        return $s;
+    }
     private function isProductNew(Product $product){ $days=(int)Configuration::get('PS_NB_DAYS_NEW_PRODUCT'); if($days<=0){ $days=20; } $dateAdd=isset($product->date_add)?strtotime($product->date_add):0; if($dateAdd<=0){ return false; } return $dateAdd >= (time() - $days*86400); }
-    private function isProductTop($productId){ if(class_exists('ProductSale')){ if(method_exists('ProductSale','getNbSales')){ try { $n=(int)ProductSale::getNbSales((int)$productId); return $n>=10; } catch(\Throwable $e){ return false; } } } return false; }
+    private function isProductTop($productId){ if(class_exists('ProductSale')){ if(method_exists('ProductSale','getNbSales')){ try { $n=(int)ProductSale::getNbSales((int)$productId); return $n>=3; } catch(\Throwable $e){ return false; } } } return false; }
     private function buildPaths($feed,$shopId,$langId,$currencyIso){ $base=$this->cacheBase(); $this->ensureDir($base); $tmp=sprintf('%s%s-%d-%d-%s.csv.tmp',$base,$feed,$shopId,$langId,$currencyIso); $fin=sprintf('%s%s-%d-%d-%s.csv',$base,$feed,$shopId,$langId,$currencyIso); $state=sprintf('%s%s-%d-%d-%s.state.json',$base,$feed,$shopId,$langId,$currencyIso); return [$tmp,$fin,$state]; }
     private function buildLock($feed,$shopId,$langId,$currencyIso){ $base=$this->lockBase(); $this->ensureDir($base); return sprintf('%s%s-%d-%d-%s.lock',$base,$feed,$shopId,$langId,$currencyIso); }
     private function openLock($lockPath){ $fh=fopen($lockPath,'c'); if($fh&&flock($fh,LOCK_EX|LOCK_NB)){ return $fh; } return null; }
