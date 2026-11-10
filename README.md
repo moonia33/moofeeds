@@ -59,6 +59,11 @@ Pastaba: moofeeds taip pat turi Newsman feed'ą (žr. URL skiltį), kurio nėra 
 - Užbaigus, `.tmp` pervadinama į galutinį `.csv`, `.state.json` pašalinama.
 - Senas `.csv` lieka pasiekiamas, kol naujas nėra pilnai sugeneruotas (pervadinimas pakeičia jį atlikus ciklą).
 
+## Multistore
+- Feed'as generuojamas parduotuvei, pagal kurios domeną kviečiamas cron (`https://<parduotuvės-domenas>/feed/cron?...`).
+- Į feed'ą patenka tik tai parduotuvei priskirtos ir joje aktyvios prekės (`product_shop`), jos parduotuvės pavadinimai (`product_lang.id_shop`), likučiai pagal parduotuvės / grupės likučių bendrinimą ir tos parduotuvės domeno nuorodos.
+- Modulis turi būti įjungtas kiekvienoje parduotuvėje, kuriai reikia feed'o. Kiekvienai parduotuvei reikia atskiros cron eilutės.
+
 ## Crontab pavyzdžiai
 Vienas kvietimas pilnai regeneruoja feed'ą. Pakeiskite `<TOKEN>` ir domeną.
 
@@ -144,6 +149,11 @@ Note: moofeeds also includes a Newsman feed (see URLs), which is an addition com
 - Progress state is written to `*.state.json` during generation.
 - When finished, `.tmp` is renamed to final `.csv` and `.state.json` is removed.
 - The old `.csv` remains available until the new one is fully generated (the rename replaces it at the end of the cycle).
+
+## Multistore
+- A feed is generated for the shop whose domain the cron URL is called on (`https://<shop-domain>/feed/cron?...`).
+- Only products associated with and active in that shop (`product_shop`), that shop's names (`product_lang.id_shop`), stock according to shop/group stock sharing and that shop's domain links are exported.
+- Enable the module in every shop that needs a feed and add one cron line per shop.
 
 ## Crontab examples
 A single call fully regenerates a feed. Replace `<TOKEN>` and domain.

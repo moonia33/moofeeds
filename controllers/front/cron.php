@@ -62,11 +62,12 @@ class moofeedscronModuleFrontController extends ModuleFrontController
         $db=Db::getInstance(); $link=$this->context->link;
         while(true){
             $sql=new DbQuery();
-            $sql->select('p.id_product, pl.name, pl.link_rewrite, p.id_manufacturer, p.id_category_default, sa.quantity')
+            $sql->select('p.id_product, pl.name, pl.link_rewrite, p.id_manufacturer, ps.id_category_default, sa.quantity')
                 ->from('product','p')
-                ->innerJoin('product_lang','pl','pl.id_product = p.id_product AND pl.id_lang='.(int)$langId)
-                ->leftJoin('stock_available','sa','sa.id_product = p.id_product AND sa.id_product_attribute = 0')
-                ->where('p.active = 1')
+                ->innerJoin('product_shop','ps','ps.id_product = p.id_product AND ps.id_shop='.(int)$shopId)
+                ->innerJoin('product_lang','pl','pl.id_product = p.id_product AND pl.id_lang='.(int)$langId.' AND pl.id_shop='.(int)$shopId)
+                ->leftJoin('stock_available','sa','sa.id_product = p.id_product AND sa.id_product_attribute = 0'.StockAvailable::addSqlShopRestriction(null,$shopId,'sa'))
+                ->where('ps.active = 1')
                 ->where($feed==='facebook' ? '1' : 'sa.quantity > 0')
                 ->where('p.id_product > '.(int)$state['last_id'])
                 ->orderBy('p.id_product ASC')
