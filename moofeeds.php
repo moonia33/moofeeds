@@ -9,7 +9,7 @@ class Moofeeds extends Module
     {
         $this->name = 'moofeeds';
         $this->tab = 'advertising_marketing';
-    $this->version = '1.1.1';
+    $this->version = '1.2.0';
         $this->author = 'moonia';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '1.7.0.0', 'max' => _PS_VERSION_];
@@ -25,8 +25,7 @@ class Moofeeds extends Module
         return parent::install()
             && $this->registerHook('moduleRoutes')
             && Configuration::updateValue('MOOFEEDS_CRON_TOKEN', Tools::passwdGen(16))
-            && Configuration::updateValue('MOOFEEDS_DEF_SIZE', 1000)
-            && Configuration::updateValue('MOOFEEDS_DEF_STEPS', 3);
+            && Configuration::updateValue('MOOFEEDS_DEF_SIZE', 1000);
     }
 
     public function uninstall()
@@ -103,11 +102,8 @@ class Moofeeds extends Module
 
         if (Tools::isSubmit('save_settings')) {
             $size = (int) Tools::getValue('def_size', 1000);
-            $steps = (int) Tools::getValue('def_steps', 3);
             if ($size < 1) { $size = 1; }
-            if ($steps < 1) { $steps = 1; }
             Configuration::updateValue('MOOFEEDS_DEF_SIZE', $size);
-            Configuration::updateValue('MOOFEEDS_DEF_STEPS', $steps);
             Tools::redirectAdmin($adminUrl . '&moofeeds_msg=defaults_saved');
         }
 
@@ -173,7 +169,6 @@ class Moofeeds extends Module
         $nmStats = $stats('newsman');
 
         $defSize = (int) Configuration::get('MOOFEEDS_DEF_SIZE');
-        $defSteps = (int) Configuration::get('MOOFEEDS_DEF_STEPS');
 
         $msg = (string) Tools::getValue('moofeeds_msg', '');
         if ($msg === 'token_regen') { $output .= $this->displayConfirmation($this->l('Token regenerated.')); }
@@ -192,15 +187,14 @@ class Moofeeds extends Module
         $output .= '<hr/>';
         $output .= '<form method="post" class="form-horizontal">';
         $output .= '<div class="form-group"><label class="control-label col-lg-3">' . $this->l('Default batch size (size)') . '</label><div class="col-lg-3"><input type="number" min="1" class="form-control" name="def_size" value="' . (int)$defSize . '"/></div></div>';
-        $output .= '<div class="form-group"><label class="control-label col-lg-3">' . $this->l('Default steps per call (max_steps)') . '</label><div class="col-lg-3"><input type="number" min="1" class="form-control" name="def_steps" value="' . (int)$defSteps . '"/></div></div>';
         $output .= '<div class="form-group"><div class="col-lg-offset-3 col-lg-3"><button class="btn btn-success" name="save_settings" value="1">' . $this->l('Save defaults') . '</button></div></div>';
         $output .= '</form>';
         $output .= '<hr/>';
-        $output .= '<p>' . $this->l('Cron endpoints (GET):') . '</p>';
+        $output .= '<p>' . $this->l('Cron endpoints (GET, vienas kvietimas = pilnas regeneravimas):') . '</p>';
         $output .= '<ul>';
-        $output .= '<li><code>' . $baseUrl . 'feed/cron?feed=facebook&size=' . (int)$defSize . '&max_steps=' . (int)$defSteps . '&token=' . pSQL($token) . '</code></li>';
-        $output .= '<li><code>' . $baseUrl . 'feed/cron?feed=googleads&size=' . (int)$defSize . '&max_steps=' . (int)$defSteps . '&token=' . pSQL($token) . '</code></li>';
-        $output .= '<li><code>' . $baseUrl . 'feed/cron?feed=newsman&size=' . (int)$defSize . '&max_steps=' . (int)$defSteps . '&token=' . pSQL($token) . '</code></li>';
+        $output .= '<li><code>' . $baseUrl . 'feed/cron?feed=facebook&size=' . (int)$defSize . '&token=' . pSQL($token) . '</code></li>';
+        $output .= '<li><code>' . $baseUrl . 'feed/cron?feed=googleads&size=' . (int)$defSize . '&token=' . pSQL($token) . '</code></li>';
+        $output .= '<li><code>' . $baseUrl . 'feed/cron?feed=newsman&size=' . (int)$defSize . '&token=' . pSQL($token) . '</code></li>';
         $output .= '</ul>';
         $output .= '<p>' . $this->l('Feeds serve cached files if present:') . '</p>';
         $output .= '<ul>';
