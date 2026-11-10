@@ -40,38 +40,39 @@ class moofeedscronModuleFrontController extends ModuleFrontController
         $langId=(int)$this->context->language->id; $shopId=(int)$this->context->shop->id; $currency=$this->context->currency; $currencyIso=is_object($currency)&&isset($currency->iso_code)?$currency->iso_code:(is_string($currency)?$currency:'EUR');
         list($tmpFile,$finalFile,$stateFile)=$this->buildPaths($feed,$shopId,$langId,$currencyIso); $lockFile=$this->buildLock($feed,$shopId,$langId,$currencyIso); $lock=$this->openLock($lockFile); if(!$lock){ header('Content-Type: application/json'); echo json_encode(['status'=>'busy']); exit; }
 
-        $defSize=(int)Configuration::get('MOOFEEDS_DEF_SIZE'); $defSteps=(int)Configuration::get('MOOFEEDS_DEF_STEPS'); if($defSize<1){$defSize=1000;} if($defSteps<1){$defSteps=3;} $size=max(1,(int)Tools::getValue('size',$defSize)); $maxSteps=max(1,(int)Tools::getValue('max_steps',$defSteps)); $reset=(bool)Tools::getValue('reset',false);
+        $defSize=(int)Configuration::get('MOOFEEDS_DEF_SIZE'); if($defSize<1){$defSize=1000;} $size=max(1,(int)Tools::getValue('size',$defSize));
+
+        // Single cron call always runs a full cycle: reset + generate until done
+        @set_time_limit(0); ignore_user_abort(true);
 
         $state=['last_id'=>0,'total'=>null,'processed'=>0];
-        if(file_exists($stateFile)&&!$reset){ $json=@file_get_contents($stateFile); if($json){ $s=json_decode($json,true); if(is_array($s)){ $state=array_merge($state,$s); } } }
-        else if($reset||!file_exists($finalFile)){
-            $out=fopen($tmpFile,'w');
-            if($feed==='facebook'){ fputcsv($out,['id','title','description','availability','condition','price','link','image_link','brand','sale_price','item_group_id','google_product_category','product_type','mpn','gtin','age_group','gender','color','material','internal_label']); }
-            elseif($feed==='googleads'){
-                // Google Ads Business Data feed requires exact header names (case- and space-sensitive)
-                // See: https://support.google.com/google-ads/answer/6053288
-                fputcsv($out,[
-                    'ID','ID2','Item title','Final URL','Image URL','Item subtitle','Item description','Item category','Price','Sale price','Contextual keywords','Item address','Tracking template','Custom parameter','Final mobile URL','Android app link','iOS app link','iOS app store ID','Formatted price','Formatted sale price'
-                ]);
-            }
-            else { fputcsv($out,['product id','product name','product url','image url','stock','price','sale price','brand','category','description']); }
-            fclose($out); @chmod($tmpFile,0664); @unlink($finalFile); $state['last_id']=0; $state['processed']=0;
-        } else { fclose($lock); header('Content-Type: application/json'); echo json_encode(['status'=>'done','file'=>$finalFile]); exit; }
+        $out=fopen($tmpFile,'w');
+        if(!$out){ fclose($lock); @unlink($lockFile); header('Content-Type: application/json'); http_response_code(500); echo json_encode(['status'=>'error','detail'=>'cannot open tmp file']); exit; }
+        if($feed==='facebook'){ fputcsv($out,['id','title','description','availability','condition','price','link','image_link','brand','sale_price','item_group_id','google_product_category','product_type','mpn','gtin','age_group','gender','color','material','internal_label']); }
+        elseif($feed==='googleads'){
+            // Google Ads Business Data feed requires exact header names (case- and space-sensitive)
+            // See: https://support.google.com/google-ads/answer/6053288
+            fputcsv($out,[
+                'ID','ID2','Item title','Final URL','Image URL','Item subtitle','Item description','Item category','Price','Sale price','Contextual keywords','Item address','Tracking template','Custom parameter','Final mobile URL','Android app link','iOS app link','iOS app store ID','Formatted price','Formatted sale price'
+            ]);
+        }
+        else { fputcsv($out,['product id','product name','product url','image url','stock','price','sale price','brand','category','description']); }
+        fclose($out); @chmod($tmpFile,0664); @unlink($stateFile);
 
-        $step=0; $db=Db::getInstance(); $link=$this->context->link;
-        while($step<$maxSteps){
+        $db=Db::getInstance(); $link=$this->context->link;
+        while(true){
             $sql=new DbQuery();
             $sql->select('p.id_product, pl.name, pl.link_rewrite, p.id_manufacturer, p.id_category_default, sa.quantity')
                 ->from('product','p')
                 ->innerJoin('product_lang','pl','pl.id_product = p.id_product AND pl.id_lang='.(int)$langId)
                 ->leftJoin('stock_available','sa','sa.id_product = p.id_product AND sa.id_product_attribute = 0')
                 ->where('p.active = 1')
-                ->where('sa.quantity > 0')
+                ->where($feed==='facebook' ? '1' : 'sa.quantity > 0')
                 ->where('p.id_product > '.(int)$state['last_id'])
                 ->orderBy('p.id_product ASC')
                 ->limit($size);
             $rows=$db->executeS($sql);
-            if(!$rows||count($rows)===0){ $renOk=@rename($tmpFile,$finalFile); if(!$renOk){ if(@copy($tmpFile,$finalFile)){ @unlink($tmpFile); $renOk=true; } } if($renOk){ @chmod($finalFile,0664);} $fsize=is_file($finalFile)?(int)@filesize($finalFile):0; @unlink($stateFile); fclose($lock); @unlink($lockFile); header('Content-Type: application/json'); echo json_encode(['status'=>'done','file'=>$finalFile,'size'=>$fsize,'renamed'=>(bool)$renOk]); exit; }
+            if(!$rows||count($rows)===0){ $renOk=@rename($tmpFile,$finalFile); if(!$renOk){ if(@copy($tmpFile,$finalFile)){ @unlink($tmpFile); $renOk=true; } } if($renOk){ @chmod($finalFile,0664);} $fsize=is_file($finalFile)?(int)@filesize($finalFile):0; @unlink($stateFile); fclose($lock); @unlink($lockFile); header('Content-Type: application/json'); echo json_encode(['status'=>'done','file'=>$finalFile,'size'=>$fsize,'processed'=>$state['processed'],'renamed'=>(bool)$renOk]); exit; }
 
             $out=fopen($tmpFile,'a');
             foreach($rows as $row){
@@ -136,8 +137,6 @@ class moofeedscronModuleFrontController extends ModuleFrontController
             }
             fclose($out);
             file_put_contents($stateFile,json_encode($state+['ts'=>time()]));
-            $step++;
         }
-        fclose($lock); header('Content-Type: application/json'); echo json_encode(['status'=>'progress','state'=>$state]); exit;
     }
 }
